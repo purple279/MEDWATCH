@@ -1,0 +1,6 @@
+{
+  "name": "MEDWATCH",
+  "description": "Medicine Shortage Early-Warning & Redistribution System for healthcare facilities and regional supply chains.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
