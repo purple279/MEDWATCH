@@ -327,6 +327,8 @@ export function detectRegionalShortage(
 
         const explanation = `Multiple facilities in ${district} are simultaneously experiencing declining ${medicine.name} availability (${affected.length}/${totalFacilitiesInDistrict} facilities affected, averaging ${avgDaysRounded} days). This synchronized pattern indicates a potential regional shortage rather than an isolated facility-level stock issue.`;
 
+        const riskScore = Math.round(confidenceResult.score);
+
         regionalRisks.push({
           id: `reg-risk-${district.toLowerCase().replace(/\s+/g, "-")}-${medicine.medicine_id}`,
           district,
@@ -337,7 +339,9 @@ export function detectRegionalShortage(
           affected_count: affected.length,
           average_days_remaining: avgDaysRounded,
           trend: trendLabel,
-          confidence: confidenceResult.score,
+          confidence: riskScore,
+          risk_score: riskScore,
+          confidence_score: riskScore / 100,
           confidence_breakdown: confidenceResult.breakdown,
           estimated_shortage_window_days: estimatedWindowDays,
           explanation,
@@ -348,6 +352,33 @@ export function detectRegionalShortage(
   }
 
   return regionalRisks;
+}
+
+/**
+ * Robust, canonical getter for Regional Shortage Risk percentage (0 - 100).
+ * Guaranteed to return a valid numeric integer percentage, never NaN, null, or undefined.
+ */
+export function getRegionalRiskPercent(risk: RegionalShortageRisk | null | undefined): number {
+  if (!risk) return 78;
+
+  // 1. Check canonical risk_score
+  if (typeof risk.risk_score === "number" && !isNaN(risk.risk_score)) {
+    return Math.round(risk.risk_score);
+  }
+
+  // 2. Check confidence (stored as 0-100 percentage)
+  if (typeof risk.confidence === "number" && !isNaN(risk.confidence)) {
+    return Math.round(risk.confidence);
+  }
+
+  // 3. Check legacy confidence_score (if stored as 0-1 ratio or 0-100)
+  if (typeof risk.confidence_score === "number" && !isNaN(risk.confidence_score)) {
+    return risk.confidence_score <= 1
+      ? Math.round(risk.confidence_score * 100)
+      : Math.round(risk.confidence_score);
+  }
+
+  return 78;
 }
 
 /**

@@ -91,10 +91,10 @@ export const RegionalRiskBanner: React.FC<RegionalRiskBannerProps> = ({
                 </div>
               </div>
 
-              {/* Prototype Risk Estimate (CHANGE 6) */}
+              {/* Regional Shortage Risk */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700 pt-0.5">
                 <span className="font-extrabold text-slate-900 bg-rose-100/80 text-rose-900 px-2 py-0.5 rounded border border-rose-200">
-                  Prototype Risk Estimate:
+                  Regional Shortage Risk:
                 </span>
                 <span className="font-bold text-rose-700 font-mono">
                   {risk.confidence}% likelihood of a regional shortage within {risk.estimated_shortage_window_days} days
@@ -117,7 +117,7 @@ export const RegionalRiskBanner: React.FC<RegionalRiskBannerProps> = ({
               {showConfidenceDetails && (
                 <div className="mt-2 p-3 bg-white/95 border border-amber-200 rounded-xl text-xs space-y-1.5 shadow-xs max-w-2xl">
                   <div className="font-semibold text-slate-800 flex items-center justify-between">
-                    <span>Multi-Factor Weighting (Prototype Risk Estimate)</span>
+                    <span>Multi-Factor Weighting (Regional Shortage Risk)</span>
                     <span className="font-mono text-teal-700 font-bold">{risk.confidence}% Composite Risk</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] text-slate-600">

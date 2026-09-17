@@ -66,7 +66,9 @@ export interface RegionalShortageRisk {
   affected_count: number;
   average_days_remaining: number;
   trend: "Accelerated Depletion" | "Declining" | "Severe Supply Shock";
-  confidence: number; // e.g. 72%
+  confidence: number; // e.g. 78%
+  risk_score?: number; // e.g. 78% (canonical 0-100 percentage)
+  confidence_score?: number; // e.g. 0.78 (normalized 0-1 ratio for backward compatibility)
   confidence_breakdown: {
     affected_facility_weight: number;
     depletion_speed_weight: number;

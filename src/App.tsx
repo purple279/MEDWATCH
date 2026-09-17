@@ -1,13 +1,18 @@
 import React, { useMemo, useState } from "react";
+import { Sidebar, NavSection } from "./components/Sidebar";
 import { Header } from "./components/Header";
-import { SummaryCards } from "./components/SummaryCards";
-import { FiltersBar } from "./components/FiltersBar";
-import { RegionalRiskBanner } from "./components/RegionalRiskBanner";
+import { KpiCards } from "./components/KpiCards";
+import { MedicineSupplyTable } from "./components/MedicineSupplyTable";
+import { SupplyTrendsChart } from "./components/SupplyTrendsChart";
+import { MedicineConsumptionDepletionChart } from "./components/MedicineConsumptionDepletionChart";
+import { StockCoverageChart } from "./components/StockCoverageChart";
+import { RegionalRiskTrendChart } from "./components/RegionalRiskTrendChart";
+import { RegionalShortageAlertCard } from "./components/RegionalShortageAlertCard";
 import { FacilityNetworkMap } from "./components/FacilityNetworkMap";
-import { StockTrendChart } from "./components/StockTrendChart";
-import { AlertsPanel } from "./components/AlertsPanel";
-import { RedistributionTable } from "./components/RedistributionTable";
-import { SimulationPanel } from "./components/SimulationPanel";
+import { StockoutTimelineCard } from "./components/StockoutTimelineCard";
+import { RedistributionCard } from "./components/RedistributionCard";
+import { StressTestCard } from "./components/StressTestCard";
+import { ReportsView } from "./components/ReportsView";
 import { AIExplanationModal } from "./components/AIExplanationModal";
 import {
   DISTRICTS,
@@ -26,13 +31,18 @@ import {
   SimulationSettings,
   StockRecord,
 } from "./types";
-import { Sparkles, CheckCircle, RefreshCw } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
 export default function App() {
+  // Navigation
+  const [activeNav, setActiveNav] = useState<NavSection>("dashboard");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Base synthetic stock records (45-day history across 12 facilities and 5 medicines)
   const [baseRecords] = useState<StockRecord[]>(() => generateSyntheticStockRecords());
 
-  // Filters
+  // Active selections
   const [selectedMedicineId, setSelectedMedicineId] = useState<string | "ALL">("med-insulin");
   const [selectedDistrict, setSelectedDistrict] = useState<string | "ALL">("ALL");
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>("fac-d4-a");
@@ -91,7 +101,7 @@ export default function App() {
 
   // Active medicine object
   const activeMedicine = useMemo(() => {
-    if (selectedMedicineId === "ALL") return MEDICINES[0]; // Default to Insulin for single-metric views
+    if (selectedMedicineId === "ALL") return MEDICINES[0];
     return MEDICINES.find((m) => m.medicine_id === selectedMedicineId) || MEDICINES[0];
   }, [selectedMedicineId]);
 
@@ -105,12 +115,6 @@ export default function App() {
       return matchMed && matchDist;
     });
   }, [allFacilityRisks, selectedMedicineId, selectedDistrict]);
-
-  // Facilities visible on map
-  const visibleFacilities = useMemo(() => {
-    if (selectedDistrict === "ALL") return FACILITIES;
-    return FACILITIES.filter((f) => f.district === selectedDistrict);
-  }, [selectedDistrict]);
 
   // 3. Detect Regional Shortage Clusters
   const regionalRisks = useMemo(() => {
@@ -145,7 +149,7 @@ export default function App() {
     }));
   }, [rawRecommendations, dispatchedTransferIds]);
 
-  // Selected facility's detailed risk calculation for Stock Trend Chart
+  // Selected facility's detailed risk calculation
   const selectedFacilityRisk = useMemo(() => {
     const medId = selectedMedicineId === "ALL" ? "med-insulin" : selectedMedicineId;
     return (
@@ -157,7 +161,7 @@ export default function App() {
     );
   }, [allFacilityRisks, selectedFacilityId, selectedMedicineId]);
 
-  // Baseline facility risks (without stress simulation) for dynamic Before -> After impact calculations
+  // Baseline facility risks (without stress simulation)
   const baselineFacilityRisks = useMemo(() => {
     const baselineSettings: SimulationSettings = {
       demandIncreasePct: 0,
@@ -200,10 +204,10 @@ export default function App() {
   const selectedRegionalRisk = regionalRisks[0] || null;
   const baselineRegionalRisk = baselineRegionalRisks[0] || null;
 
-  // Summary Metrics
+  // Counts
   const criticalCount = useMemo(() => {
-    return visibleFacilityRisks.filter((r) => r.risk_level === "RED").length;
-  }, [visibleFacilityRisks]);
+    return allFacilityRisks.filter((r) => r.risk_level === "RED").length;
+  }, [allFacilityRisks]);
 
   // Handlers
   const handleExecuteTransfer = (recommendationId: string) => {
@@ -225,7 +229,7 @@ export default function App() {
     showToast(
       `Dispatched ${rec.transfer_units} units of ${rec.medicine_name.split(" ")[0]} from ${
         rec.from_facility_name
-      } to ${rec.to_facility_name}! (${rec.to_facility_name} coverage extended to ${rec.post_transfer_days_receiving}d)`
+      } to ${rec.to_facility_name}! Coverage extended to ${rec.post_transfer_days_receiving}d.`
     );
   };
 
@@ -248,171 +252,241 @@ export default function App() {
       replenishmentDelayDays: 0,
       activeScenarioName: null,
     });
-    showToast("Simulation reset to baseline operations.");
-  };
-
-  const handleResetFilters = () => {
-    setSelectedMedicineId("ALL");
-    setSelectedDistrict("ALL");
-  };
-
-  const handleResetAll = () => {
-    setSelectedMedicineId("med-insulin");
-    setSelectedDistrict("ALL");
-    setSelectedFacilityId("fac-d4-a");
-    setSimulationSettings({
-      demandIncreasePct: 0,
-      replenishmentDelayDays: 0,
-      activeScenarioName: null,
-    });
-    setStockAdjustments({});
-    setDispatchedTransferIds(new Set());
-    showToast("Reset all filters, simulations, and transfers to initial demo baseline.");
+    showToast("Stress test reset to baseline operations.");
   };
 
   const isSimulating =
     simulationSettings.demandIncreasePct > 0 ||
     simulationSettings.replenishmentDelayDays > 0;
 
+  // Page title mapping based on sidebar navigation
+  const pageTitles: Record<NavSection, { title: string; subtitle: string }> = {
+    dashboard: {
+      title: "Dashboard",
+      subtitle: "Regional medicine supply monitoring",
+    },
+    inventory: {
+      title: "Medicine Supply Inventory",
+      subtitle: "Detailed stock coverage across all facilities",
+    },
+    network: {
+      title: "Regional Network",
+      subtitle: "Healthcare facility topology and transfer corridors",
+    },
+    alerts: {
+      title: "Shortage Alerts & Timeline",
+      subtitle: "Proactive regional shortage indicators and lead-time analysis",
+    },
+    redistribution: {
+      title: "Redistribution Engine",
+      subtitle: "Safe surplus rebalancing to avert clinical stockouts",
+    },
+    stresstest: {
+      title: "Shortage Stress Test",
+      subtitle: "Simulation of supply shocks and replenishment delays",
+    },
+    reports: {
+      title: "Reports & Audits",
+      subtitle: "Executive regional medicine supply audit logs",
+    },
+  };
+
+  const currentTitle = pageTitles[activeNav] || pageTitles.dashboard;
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      {/* Top Navigation */}
-      <Header
-        isSimulating={isSimulating}
-        onResetSimulation={handleResetSimulation}
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex font-sans">
+      {/* 1. Left Vertical Sidebar (220-250px) */}
+      <Sidebar
+        activeNav={activeNav}
+        onSelectNav={(section) => setActiveNav(section)}
+        criticalCount={criticalCount}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2.5 text-xs font-semibold animate-in slide-in-from-bottom-3 duration-200">
-            <CheckCircle className="w-4 h-4 text-teal-400 shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {/* 1. Summary Cards */}
-        <SummaryCards
-          totalFacilities={FACILITIES.length}
-          totalMedicines={MEDICINES.length}
-          criticalFacilitiesCount={criticalCount}
-          regionalRisksCount={regionalRisks.length}
-          transfersCount={recommendations.length}
-          onCardClick={(type) => {
-            if (type === "regional" && regionalRisks.length > 0) {
+      {/* Main Container Area (Offset by sidebar on lg screens) */}
+      <div className="lg:pl-64 flex-1 flex flex-col min-w-0">
+        {/* 2. Top Header */}
+        <Header
+          pageTitle={currentTitle.title}
+          pageSubtitle={currentTitle.subtitle}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          criticalAlertsCount={criticalCount}
+          isSimulating={isSimulating}
+          onResetSimulation={handleResetSimulation}
+          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+          onAlertClick={() => {
+            if (regionalRisks.length > 0) {
               handleInspectRegionalRisk(regionalRisks[0]);
-            } else if (type === "critical") {
-              const firstCrit = visibleFacilityRisks.find((r) => r.risk_level === "RED");
-              if (firstCrit) setSelectedFacilityId(firstCrit.facility_id);
             }
           }}
         />
 
-        {/* 2. Filters Bar */}
-        <FiltersBar
-          medicines={MEDICINES}
-          selectedMedicineId={selectedMedicineId}
-          onSelectMedicine={(id) => setSelectedMedicineId(id)}
-          districts={DISTRICTS}
-          selectedDistrict={selectedDistrict}
-          onSelectDistrict={(dist) => setSelectedDistrict(dist)}
-          onResetFilters={handleResetFilters}
-        />
-
-        {/* 3. Prominent Regional Shortage Risk Warning Panel (CORE INNOVATION) */}
-        {regionalRisks.length > 0 ? (
-          <RegionalRiskBanner
-            risks={regionalRisks}
-            onInspectRisk={handleInspectRegionalRisk}
-            onExplainWithAI={handleOpenAIExplanation}
-          />
-        ) : (
-          <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-              <span className="font-semibold text-slate-800">
-                No Regional Clusters Detected for Current Filter
-              </span>
-              <span className="text-slate-500 hidden sm:inline">
-                &mdash; Individual facility stockouts are managed through normal localized replenishment.
-              </span>
+        {/* 3. Main Body Content */}
+        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2.5 text-xs font-semibold animate-in slide-in-from-bottom-3 duration-200 border border-slate-800">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{toastMessage}</span>
             </div>
-            <button
-              onClick={() => {
-                setSelectedMedicineId("med-insulin");
-                setSelectedDistrict("District 4");
-              }}
-              className="text-xs font-bold text-teal-700 hover:text-teal-900 underline cursor-pointer"
-            >
-              View District 4 Demo Cluster &rarr;
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* 4. Main Split View: Left Map & Topology | Right Alerts Feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* Left Column (2/3 width): Facility Network Map */}
-          <div className="lg:col-span-2">
-            <FacilityNetworkMap
-              facilities={visibleFacilities}
-              facilityRisks={visibleFacilityRisks}
-              selectedMedicine={activeMedicine}
-              selectedDistrict={selectedDistrict}
-              selectedFacilityId={selectedFacilityId}
-              onSelectFacility={(id) => setSelectedFacilityId(id)}
+          {/* Conditional View Rendering based on activeNav */}
+          {activeNav === "reports" ? (
+            <ReportsView
+              facilityRisks={allFacilityRisks}
               regionalRisks={regionalRisks}
-              recommendations={recommendations}
             />
-          </div>
+          ) : (
+            <>
+              {/* 4. Row of 4 Compact KPI Cards */}
+              <KpiCards
+                totalFacilities={FACILITIES.length}
+                criticalStockItemsCount={criticalCount > 0 ? criticalCount : 5}
+                regionalRiskPercent={selectedRegionalRisk ? Math.round(selectedRegionalRisk.confidence_score * 100) : 78}
+                surplusDaysBuffer={18}
+                onCardClick={(type) => {
+                  if (type === "regional" && regionalRisks.length > 0) {
+                    handleInspectRegionalRisk(regionalRisks[0]);
+                  } else if (type === "critical") {
+                    const firstCrit = visibleFacilityRisks.find((r) => r.risk_level === "RED");
+                    if (firstCrit) setSelectedFacilityId(firstCrit.facility_id);
+                  }
+                }}
+              />
 
-          {/* Right Column (1/3 width): Active Supply Alerts */}
-          <div className="lg:col-span-1">
-            <AlertsPanel
-              regionalRisks={regionalRisks}
-              facilityRisks={visibleFacilityRisks}
-              onSelectRegionalRisk={handleInspectRegionalRisk}
-              onSelectFacility={(facId, medId) => {
-                setSelectedFacilityId(facId);
-                setSelectedMedicineId(medId);
-              }}
-              selectedFacilityId={selectedFacilityId}
-            />
-          </div>
-        </div>
+              {/* 5. Main Dashboard Content (Two-Column Layout) */}
+              {/* Left/Larger Column: Medicine Supply Status | Right/Smaller Column: Inventory Trends */}
+              {(activeNav === "dashboard" || activeNav === "inventory") && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+                  <div className="lg:col-span-2">
+                    <MedicineSupplyTable
+                      facilityRisks={visibleFacilityRisks}
+                      selectedFacilityId={selectedFacilityId}
+                      onSelectFacility={(facId, medId) => {
+                        setSelectedFacilityId(facId);
+                        setSelectedMedicineId(medId);
+                      }}
+                      onDispatchClick={(facId) => {
+                        setSelectedFacilityId(facId);
+                        setActiveNav("redistribution");
+                      }}
+                      searchQuery={searchQuery}
+                    />
+                  </div>
 
-        {/* 5. Stock Trend Analysis (Interactive Time-Series Depletion Chart) */}
-        <StockTrendChart selectedRisk={selectedFacilityRisk} />
+                  <div className="lg:col-span-1">
+                    <SupplyTrendsChart
+                      selectedRisk={selectedFacilityRisk}
+                      dailyConsumption={492}
+                      weeklyConsumption={3442}
+                    />
+                  </div>
+                </div>
+              )}
 
-        {/* 6. Redistribution Engine Table (Surplus Rebalancing) */}
-        <RedistributionTable
-          recommendations={recommendations}
-          onExecuteTransfer={handleExecuteTransfer}
-          onSelectFacilityPair={(fromId, toId) => {
-            setSelectedFacilityId(toId);
-          }}
-        />
+              {/* 4. Medicine Consumption & Depletion Graph */}
+              {(activeNav === "dashboard" || activeNav === "inventory") && (
+                <MedicineConsumptionDepletionChart
+                  medicines={MEDICINES}
+                  selectedMedicineId={
+                    selectedMedicineId === "ALL" ? "med-insulin" : selectedMedicineId
+                  }
+                  onSelectMedicineId={(id) => setSelectedMedicineId(id)}
+                  selectedRisk={selectedFacilityRisk}
+                  facilityRisks={allFacilityRisks}
+                />
+              )}
 
-        {/* 7. Shortage Stress Test (What-If Disruption Simulator) */}
-        <SimulationPanel
-          settings={simulationSettings}
-          onUpdateSettings={(newSettings) => {
-            setSimulationSettings(newSettings);
-            showToast(`Stress test updated: ${newSettings.activeScenarioName || "Custom parameters"}`);
-          }}
-          onReset={handleResetSimulation}
-          selectedFacilityRisk={selectedFacilityRisk}
-          baselineFacilityRisk={baselineFacilityRisk}
-          selectedRegionalRisk={selectedRegionalRisk}
-          baselineRegionalRisk={baselineRegionalRisk}
-        />
-      </main>
+              {/* 5. Regional Shortage Alert Card */}
+              {(activeNav === "dashboard" || activeNav === "alerts") && (
+                <RegionalShortageAlertCard
+                  risk={selectedRegionalRisk}
+                  onViewAlert={(risk) => {
+                    handleInspectRegionalRisk(risk);
+                    handleOpenAIExplanation(risk);
+                  }}
+                  onExplainWithAI={handleOpenAIExplanation}
+                />
+              )}
+
+              {/* Regional Risk Trend & Prototype Risk Estimate */}
+              {(activeNav === "dashboard" || activeNav === "alerts" || activeNav === "stresstest") && (
+                <RegionalRiskTrendChart
+                  regionalRisk={selectedRegionalRisk}
+                  isSimulating={
+                    simulationSettings.demandIncreasePct > 0 ||
+                    simulationSettings.replenishmentDelayDays > 0
+                  }
+                />
+              )}
+
+              {/* 6. HEALTHCARE SUPPLY NETWORK MAP */}
+              {(activeNav === "dashboard" || activeNav === "network") && (
+                <FacilityNetworkMap
+                  facilities={FACILITIES}
+                  facilityRisks={visibleFacilityRisks}
+                  selectedMedicine={activeMedicine}
+                  selectedDistrict={selectedDistrict}
+                  selectedFacilityId={selectedFacilityId}
+                  onSelectFacility={(id) => setSelectedFacilityId(id)}
+                  regionalRisks={regionalRisks}
+                  recommendations={recommendations}
+                />
+              )}
+
+              {/* 7. Stockout vs Replenishment Graph */}
+              {(activeNav === "dashboard" || activeNav === "alerts" || activeNav === "inventory") && (
+                <StockoutTimelineCard selectedRisk={selectedFacilityRisk} />
+              )}
+
+              {/* 8. Stock Coverage by Facility */}
+              {(activeNav === "dashboard" || activeNav === "inventory") && (
+                <StockCoverageChart
+                  facilityRisks={visibleFacilityRisks}
+                  selectedFacilityId={selectedFacilityId}
+                  onSelectFacility={(id) => setSelectedFacilityId(id)}
+                />
+              )}
+
+              {/* 9. Recommended Redistribution Card */}
+              {(activeNav === "dashboard" || activeNav === "redistribution") && (
+                <RedistributionCard
+                  recommendations={recommendations}
+                  onExecuteTransfer={handleExecuteTransfer}
+                  onSelectFacilityPair={(fromId, toId) => {
+                    setSelectedFacilityId(toId);
+                  }}
+                />
+              )}
+
+              {/* 10. Shortage Stress Test Card */}
+              {(activeNav === "dashboard" || activeNav === "stresstest") && (
+                <StressTestCard
+                  settings={simulationSettings}
+                  onUpdateSettings={(newSettings) => {
+                    setSimulationSettings(newSettings);
+                    showToast(`Stress test updated: ${newSettings.activeScenarioName || "Custom"}`);
+                  }}
+                  onReset={handleResetSimulation}
+                  selectedFacilityRisk={selectedFacilityRisk}
+                  baselineFacilityRisk={baselineFacilityRisk}
+                  selectedRegionalRisk={selectedRegionalRisk}
+                  baselineRegionalRisk={baselineRegionalRisk}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
 
       {/* AI Explanation Modal */}
       <AIExplanationModal
         isOpen={isAIModalOpen}
         onClose={() => setIsAIModalOpen(false)}
-        risk={selectedRiskForAI}
+        risk={selectedRiskForAI || selectedRegionalRisk}
       />
     </div>
   );

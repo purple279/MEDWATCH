@@ -46,7 +46,7 @@ export const MEDICINES: Medicine[] = [
 export const DISTRICTS = ["District 1", "District 2", "District 3", "District 4"];
 
 export const FACILITIES: Facility[] = [
-  // District 4 - Demonstration Focus (3 Warning/Critical + 1 Surplus)
+  // District 4 - Regional Shortage Focus (3 Critical / Warning Facilities Affected)
   {
     facility_id: "fac-d4-a",
     name: "St. Jude District Hospital",
@@ -74,17 +74,8 @@ export const FACILITIES: Facility[] = [
     population_served: 38000,
     facility_type: "Clinic",
   },
-  {
-    facility_id: "fac-d4-d",
-    name: "Eastside Regional Medical Center",
-    district: "District 4",
-    latitude: 37.752,
-    longitude: -122.378,
-    population_served: 115000,
-    facility_type: "Regional Medical Center",
-  },
 
-  // District 2 - Secondary Alerts (e.g. Ceftriaxone Early Warning)
+  // District 2 - Secondary Alerts
   {
     facility_id: "fac-d2-a",
     name: "District 2 General Hospital",
@@ -142,7 +133,7 @@ export const FACILITIES: Facility[] = [
     facility_type: "Clinic",
   },
 
-  // District 3 - Rural / Suburban Periphery
+  // District 3 - South Ridge (Includes Surplus Donor Facility)
   {
     facility_id: "fac-d3-a",
     name: "Lakeside Memorial Hospital",
@@ -160,6 +151,15 @@ export const FACILITIES: Facility[] = [
     longitude: -122.418,
     population_served: 42000,
     facility_type: "Community Health Center",
+  },
+  {
+    facility_id: "fac-d4-d",
+    name: "Eastside Regional Medical Center",
+    district: "District 3",
+    latitude: 37.752,
+    longitude: -122.378,
+    population_served: 115000,
+    facility_type: "Regional Medical Center",
   },
 ];
 
